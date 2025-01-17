@@ -11,28 +11,38 @@ go install github.com/TBXark/gbvm@latest
 ## Usage
 
 ```bash
-Usage: gbvm <command> [options]
+Usage: gbvm list [options]
 
-A command line tool to manage Go binaries
+List all installed Go binaries
 
-list commands:
   -help
         show help
   -json
         json mode
   -versions
         show version
+```
 
-upgrade commands:
+```bash
+Usage: gbvm install [options] <backup file>
+
+Install Go binaries from backup file
+
+  -help
+        show help
+```
+
+```bash
+Usage: gbvm upgrade [options] [bin1 bin2 ...]
+
+Upgrade Go binaries
+
   -help
         show help
   -skip-dev
         skip dev version
+```
 
-install commands:
-  -help
-        show help
-````
 
 ### Install Command
 

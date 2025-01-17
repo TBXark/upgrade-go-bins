@@ -45,10 +45,9 @@ func main() {
 	printDefaults := func() {
 		fmt.Printf("Usage: gbvm <command> [options]\n\n")
 		fmt.Printf("A command line tool to manage Go binaries\n\n")
-		for _, cmd := range commands {
-			fmt.Printf("%s commands:\n", cmd.Name)
+		for name, cmd := range commands {
+			fmt.Printf("%s Command:\n", strings.Title(name))
 			cmd.FlagSet.PrintDefaults()
-			fmt.Println("")
 		}
 	}
 
@@ -96,6 +95,11 @@ func init() {
 
 func setupListCommand() *Command {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Printf("Usage: gbvm list [options]\n\n")
+		fmt.Printf("List all installed Go binaries\n\n")
+		fs.PrintDefaults()
+	}
 	showVersion := fs.Bool("versions", false, "show version")
 	jsonMode := fs.Bool("json", false, "json mode")
 	cmd := NewCommand(fs, func() error {
@@ -106,6 +110,11 @@ func setupListCommand() *Command {
 
 func setupUpgradeCommand() *Command {
 	fs := flag.NewFlagSet("upgrade", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Printf("Usage: gbvm upgrade [options] [bin1 bin2 ...]\n\n")
+		fmt.Printf("Upgrade Go binaries\n\n")
+		fs.PrintDefaults()
+	}
 	skipDev := fs.Bool("skip-dev", false, "skip dev version")
 	return NewCommand(fs, func() error {
 		if fs.NArg() == 0 {
@@ -124,6 +133,11 @@ func setupUpgradeCommand() *Command {
 
 func setupInstallCommand() *Command {
 	fs := flag.NewFlagSet("install", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Printf("Usage: gbvm install [options] <backup file>\n\n")
+		fmt.Printf("Install Go binaries from backup file\n\n")
+		fs.PrintDefaults()
+	}
 	return NewCommand(fs, func() error {
 		if fs.NArg() == 0 {
 			return fmt.Errorf("missing backup file")
