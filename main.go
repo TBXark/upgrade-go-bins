@@ -13,6 +13,28 @@ import (
 	"strings"
 )
 
+var (
+	GoPath  = os.Getenv("GOPATH")
+	GoProxy = os.Getenv("GOPROXY")
+)
+
+func init() {
+	if GoPath == "" {
+		GoPath = "~/go"
+	}
+	if GoProxy == "" {
+		if strings.Contains(GoPath, ",") {
+			proxies := strings.Split(GoPath, ",")
+			if len(proxies) > 0 {
+				GoProxy = proxies[0]
+			}
+		}
+		if GoProxy == "" {
+			GoProxy = "https://proxy.golang.org"
+		}
+	}
+}
+
 type BinInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
@@ -70,7 +92,7 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		err = runInstallSubCommand(*backupJsonPath)
+		err = runInstallBackupCommand(*backupJsonPath)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -103,7 +125,7 @@ func runListSubCommand(err error, listJsonMode bool, listShowVersion bool) error
 	return nil
 }
 
-func runInstallSubCommand(backupJsonPath string) error {
+func runInstallBackupCommand(backupJsonPath string) error {
 	file, err := os.ReadFile(backupJsonPath)
 	if err != nil {
 		return err
@@ -114,16 +136,28 @@ func runInstallSubCommand(backupJsonPath string) error {
 		return err
 	}
 	for _, v := range version {
-		err = installBinByVersion(v.Path, v.Version)
-		if err != nil {
+		if info, e := loadBinInfo(v.Path); e == nil && info.Main.Version == v.Version {
+			fmt.Printf("skip %s\n", v.Name)
+		}
+		e := installBinByVersion(v.Path, v.Version)
+		if e != nil {
 			fmt.Println(err)
 		}
 	}
 	return nil
 }
 
+func loadBinInfo(binPath string) (*buildinfo.BuildInfo, error) {
+	file, err := os.Open(binPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	return buildinfo.Read(file)
+}
+
 func loadAllBinVersion() ([]BinInfo, error) {
-	binPaths := filepath.Join(os.Getenv("GOPATH"), "bin")
+	binPaths := filepath.Join(GoPath, "bin")
 	files, err := os.ReadDir(binPaths)
 	if err != nil {
 		return nil, err
@@ -131,7 +165,7 @@ func loadAllBinVersion() ([]BinInfo, error) {
 	var result []BinInfo
 	for _, file := range files {
 		binPath := filepath.Join(binPaths, file.Name())
-		bi, e := getBinInfo(binPath)
+		bi, e := loadBinInfo(binPath)
 		if e != nil {
 			continue
 		}
@@ -154,7 +188,7 @@ func upgradeAllBinVersion(skipDev bool) error {
 		if skipDev && v.Version == "devel" {
 			continue
 		}
-		latestVersion, e := getLatestVersion(v.Mod)
+		latestVersion, e := fetchLatestVersion(v.Mod)
 		if e != nil {
 			fmt.Printf("get latest version of %s failed: %s\n", v.Name, e)
 			continue
@@ -171,12 +205,12 @@ func upgradeAllBinVersion(skipDev bool) error {
 }
 
 func upgradeBinVersion(binName string) error {
-	binPath := filepath.Join(os.Getenv("GOPATH"), "bin", binName)
-	bi, err := getBinInfo(binPath)
+	binPath := filepath.Join(GoPath, "bin", binName)
+	bi, err := loadBinInfo(binPath)
 	if err != nil {
 		return err
 	}
-	latestVersion, err := getLatestVersion(bi.Main.Path)
+	latestVersion, err := fetchLatestVersion(bi.Main.Path)
 	if err != nil {
 		return err
 	}
@@ -190,17 +224,8 @@ func upgradeBinVersion(binName string) error {
 	return nil
 }
 
-func getBinInfo(binPath string) (*buildinfo.BuildInfo, error) {
-	file, err := os.Open(binPath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	return buildinfo.Read(file)
-}
-
-func getLatestVersion(modName string) (string, error) {
-	url := fmt.Sprintf("https://proxy.golang.org/%s/@latest", strings.ToLower(modName))
+func fetchLatestVersion(modName string) (string, error) {
+	url := fmt.Sprintf("%s/%s/@latest", GoProxy, strings.ToLower(modName))
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
