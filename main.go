@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -17,6 +18,8 @@ var (
 	GoPath  string
 	GoProxy string
 )
+
+const develVersion = "(devel)"
 
 type BinInfo struct {
 	Name    string `json:"name"`
@@ -197,7 +200,6 @@ func loadBinInfo(binPath string) (*BinInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	// filename without path
 	fineName := filepath.Base(binPath)
 	return &BinInfo{
 		Name:    fineName,
@@ -231,7 +233,7 @@ func upgradeAllBins(skipDev bool) error {
 		return err
 	}
 	for _, v := range versions {
-		if skipDev && v.Version == "devel" {
+		if skipDev && v.Version == develVersion {
 			continue
 		}
 		if e := tryUpgradeBin(v); e != nil {
@@ -255,7 +257,7 @@ func tryUpgradeBin(bin *BinInfo) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch latest version: %v", err)
 	}
-	if latestVersion != bin.Version {
+	if compareVersions(bin.Version, latestVersion) < 0 {
 		fmt.Printf("upgrading %s from %s to %s\n", bin.Name, bin.Version, latestVersion)
 		return installBinByVersion(bin.Path, latestVersion)
 	}
@@ -292,4 +294,43 @@ func fetchLatestVersion(modName string) (string, error) {
 func installBinByVersion(cmdPath, version string) error {
 	uri := fmt.Sprintf("%s@%s", cmdPath, version)
 	return exec.Command("go", "install", uri).Run()
+}
+
+func trimVersion(version string) string {
+	if version == develVersion {
+		return "0"
+	}
+	ver := strings.Split(strings.TrimPrefix(version, "v"), "-")
+	if len(ver) > 1 && ver[0] == "0.0.0" {
+		if ts, err := strconv.ParseInt(ver[1], 10, 64); err == nil {
+			return fmt.Sprintf("0.0.0.%d", ts)
+		}
+	}
+	return ver[0]
+}
+
+func compareVersions(v1, v2 string) int {
+	parts1 := strings.Split(trimVersion(v1), ".")
+	parts2 := strings.Split(trimVersion(v2), ".")
+	maxLen := len(parts1)
+	if len(parts2) > maxLen {
+		maxLen = len(parts2)
+	}
+	for i := 0; i < maxLen; i++ {
+		num1 := 0
+		if i < len(parts1) {
+			num1, _ = strconv.Atoi(parts1[i])
+		}
+		num2 := 0
+		if i < len(parts2) {
+			num2, _ = strconv.Atoi(parts2[i])
+		}
+		if num1 > num2 {
+			return 1
+		}
+		if num1 < num2 {
+			return -1
+		}
+	}
+	return 0
 }
