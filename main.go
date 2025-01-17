@@ -14,26 +14,9 @@ import (
 )
 
 var (
-	GoPath  = os.Getenv("GOPATH")
-	GoProxy = os.Getenv("GOPROXY")
+	GoPath  string
+	GoProxy string
 )
-
-func init() {
-	if GoPath == "" {
-		GoPath = "~/go"
-	}
-	if GoProxy == "" {
-		if strings.Contains(GoPath, ",") {
-			proxies := strings.Split(GoPath, ",")
-			if len(proxies) > 0 {
-				GoProxy = proxies[0]
-			}
-		}
-		if GoProxy == "" {
-			GoProxy = "https://proxy.golang.org"
-		}
-	}
-}
 
 type BinInfo struct {
 	Name    string `json:"name"`
@@ -42,81 +25,130 @@ type BinInfo struct {
 	Path    string `json:"path"`
 }
 
+type Command struct {
+	Name       string
+	FlagSet    *flag.FlagSet
+	HandleFunc func() error
+}
+
 func main() {
-	listCmd := flag.NewFlagSet("list", flag.ExitOnError)
-	listShowVersion := listCmd.Bool("version", true, "show version")
-	listJsonMode := listCmd.Bool("json", false, "json mode")
+	loadGoConfig()
 
-	upgradeCmd := flag.NewFlagSet("upgrade", flag.ExitOnError)
-	upgradeAll := upgradeCmd.Bool("all", false, "upgrade all")
-	binName := upgradeCmd.String("bin", "", "bin name")
-	skipDev := upgradeCmd.Bool("skip-dev", false, "skip dev version")
+	listCmd := setupListCommand()
+	upgradeCmd := setupUpgradeCommand()
+	installCmd := setupInstallCommand()
 
-	installCmd := flag.NewFlagSet("install", flag.ExitOnError)
-	backupJsonPath := installCmd.String("backup", "", "backup json path")
+	commands := map[string]*Command{
+		"list":    listCmd,
+		"upgrade": upgradeCmd,
+		"install": installCmd,
+	}
 
 	if len(os.Args) < 2 {
-		fmt.Println("usage: go run main.go [list|upgrade]")
+		printUsage()
 		return
 	}
-	switch os.Args[1] {
-	case "list":
-		err := listCmd.Parse(os.Args[2:])
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		err = runListSubCommand(err, *listJsonMode, *listShowVersion)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	case "upgrade":
-		err := upgradeCmd.Parse(os.Args[2:])
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		if *upgradeAll {
-			err = upgradeAllBinVersion(*skipDev)
-		} else {
-			err = upgradeBinVersion(*binName)
-		}
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	case "install":
-		err := installCmd.Parse(os.Args[2:])
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		err = runInstallBackupCommand(*backupJsonPath)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	default:
-		fmt.Println("usage: go run main.go [list|upgrade]")
+
+	cmd, exists := commands[os.Args[1]]
+	if !exists {
+		printUsage()
+		return
+	}
+
+	if err := cmd.FlagSet.Parse(os.Args[2:]); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if err := cmd.HandleFunc(); err != nil {
+		fmt.Println(err)
 	}
 }
 
-func runListSubCommand(err error, listJsonMode bool, listShowVersion bool) error {
-	version, err := loadAllBinVersion()
+func loadGoConfig() {
+	goPath := os.Getenv("GOPATH")
+	if goPath == "" {
+		goPath = "~/go"
+	}
+	goProxy := os.Getenv("GOPROXY")
+	if goProxy == "" {
+		if strings.Contains(goPath, ",") {
+			proxies := strings.Split(goPath, ",")
+			if len(proxies) > 0 {
+				goProxy = proxies[0]
+			}
+		}
+		if goProxy == "" {
+			goProxy = "https://proxy.golang.org"
+		}
+	}
+	GoPath = goPath
+	GoProxy = goProxy
+}
+
+func setupListCommand() *Command {
+	fs := flag.NewFlagSet("list", flag.ExitOnError)
+	showVersion := fs.Bool("version", true, "show version")
+	jsonMode := fs.Bool("json", false, "json mode")
+	return &Command{
+		Name:    "list",
+		FlagSet: fs,
+		HandleFunc: func() error {
+			return handleList(*jsonMode, *showVersion)
+		},
+	}
+}
+
+func setupUpgradeCommand() *Command {
+	fs := flag.NewFlagSet("upgrade", flag.ExitOnError)
+	all := fs.Bool("all", false, "upgrade all")
+	bin := fs.String("bin", "", "bin name")
+	skipDev := fs.Bool("skip-dev", false, "skip dev version")
+
+	return &Command{
+		Name:    "upgrade",
+		FlagSet: fs,
+		HandleFunc: func() error {
+			if *all {
+				return upgradeAllBins(*skipDev)
+			}
+			return upgradeBin(*bin)
+		},
+	}
+}
+
+func setupInstallCommand() *Command {
+	fs := flag.NewFlagSet("install", flag.ExitOnError)
+	backupPath := fs.String("backup", "", "backup json path")
+
+	return &Command{
+		Name:    "install",
+		FlagSet: fs,
+		HandleFunc: func() error {
+			return handleInstall(*backupPath)
+		},
+	}
+}
+
+func printUsage() {
+	fmt.Println("usage: go run main.go [list|upgrade|install]")
+}
+
+func handleList(jsonMode, showVersion bool) error {
+	versions, err := loadAllBinVersions()
 	if err != nil {
 		return err
 	}
-	if listJsonMode {
-		data, e := json.MarshalIndent(version, "", "  ")
-		if e != nil {
+	if jsonMode {
+		encoded, err := json.MarshalIndent(versions, "", "  ")
+		if err != nil {
 			return err
 		}
-		fmt.Println(string(data))
+		fmt.Println(string(encoded))
 		return nil
 	}
-	for _, v := range version {
-		if listShowVersion {
+	for _, v := range versions {
+		if showVersion {
 			fmt.Printf("%s\t%s\n", v.Name, v.Version)
 		} else {
 			fmt.Println(v.Name)
@@ -125,101 +157,98 @@ func runListSubCommand(err error, listJsonMode bool, listShowVersion bool) error
 	return nil
 }
 
-func runInstallBackupCommand(backupJsonPath string) error {
-	file, err := os.ReadFile(backupJsonPath)
+func handleInstall(backupPath string) error {
+	file, err := os.ReadFile(backupPath)
 	if err != nil {
 		return err
 	}
-	var version []BinInfo
-	err = json.Unmarshal(file, &version)
-	if err != nil {
-		return err
+	var versions []*BinInfo
+	if e := json.Unmarshal(file, &versions); e != nil {
+		return e
 	}
-	for _, v := range version {
-		if info, e := loadBinInfo(v.Path); e == nil && info.Main.Version == v.Version {
+	for _, v := range versions {
+		if info, le := loadBinInfo(v.Path); le == nil && info.Version == v.Version {
 			fmt.Printf("skip %s\n", v.Name)
+			continue
 		}
-		e := installBinByVersion(v.Path, v.Version)
-		if e != nil {
-			fmt.Println(err)
+		if ie := installBinByVersion(v.Path, v.Version); ie != nil {
+			fmt.Printf("failed to install %s: %v\n", v.Name, ie)
 		}
 	}
 	return nil
 }
 
-func loadBinInfo(binPath string) (*buildinfo.BuildInfo, error) {
+func loadBinInfo(binPath string) (*BinInfo, error) {
 	file, err := os.Open(binPath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
-	return buildinfo.Read(file)
-}
-
-func loadAllBinVersion() ([]BinInfo, error) {
-	binPaths := filepath.Join(GoPath, "bin")
-	files, err := os.ReadDir(binPaths)
+	info, err := buildinfo.Read(file)
 	if err != nil {
 		return nil, err
 	}
-	var result []BinInfo
+	// filename without path
+	fineName := filepath.Base(binPath)
+	return &BinInfo{
+		Name:    fineName,
+		Version: info.Main.Version,
+		Mod:     info.Main.Path,
+		Path:    info.Path,
+	}, err
+}
+
+func loadAllBinVersions() ([]*BinInfo, error) {
+	binPath := filepath.Join(GoPath, "bin")
+	files, err := os.ReadDir(binPath)
+	if err != nil {
+		return nil, err
+	}
+	var result []*BinInfo
 	for _, file := range files {
-		binPath := filepath.Join(binPaths, file.Name())
-		bi, e := loadBinInfo(binPath)
+		fullPath := filepath.Join(binPath, file.Name())
+		info, e := loadBinInfo(fullPath)
 		if e != nil {
 			continue
 		}
-		result = append(result, BinInfo{
-			Name:    file.Name(),
-			Version: bi.Main.Version,
-			Mod:     bi.Main.Path,
-			Path:    bi.Path,
-		})
+		result = append(result, info)
 	}
 	return result, nil
 }
 
-func upgradeAllBinVersion(skipDev bool) error {
-	version, err := loadAllBinVersion()
+func upgradeAllBins(skipDev bool) error {
+	versions, err := loadAllBinVersions()
 	if err != nil {
 		return err
 	}
-	for _, v := range version {
+	for _, v := range versions {
 		if skipDev && v.Version == "devel" {
 			continue
 		}
-		latestVersion, e := fetchLatestVersion(v.Mod)
-		if e != nil {
-			fmt.Printf("get latest version of %s failed: %s\n", v.Name, e)
-			continue
-		}
-		if latestVersion != v.Version {
-			fmt.Printf("upgrading %s from %s to %s\n", v.Name, v.Version, latestVersion)
-			err = installBinByVersion(v.Path, latestVersion)
-			if err != nil {
-				fmt.Printf("upgrade %s failed: %s\n", v.Name, err)
-			}
+		if e := tryUpgradeBin(v); e != nil {
+			fmt.Printf("failed to upgrade %s: %v\n", v.Name, e)
 		}
 	}
 	return nil
 }
 
-func upgradeBinVersion(binName string) error {
+func upgradeBin(binName string) error {
 	binPath := filepath.Join(GoPath, "bin", binName)
-	bi, err := loadBinInfo(binPath)
+	info, err := loadBinInfo(binPath)
 	if err != nil {
 		return err
 	}
-	latestVersion, err := fetchLatestVersion(bi.Main.Path)
+	return tryUpgradeBin(info)
+}
+
+func tryUpgradeBin(bin *BinInfo) error {
+	latestVersion, err := fetchLatestVersion(bin.Mod)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch latest version: %v", err)
 	}
-	if latestVersion != bi.Main.Version {
-		fmt.Printf("upgrading %s from %s to %s\n", bi.Main.Path, bi.Main.Version, latestVersion)
-		err = installBinByVersion(bi.Path, latestVersion)
-		if err != nil {
-			fmt.Println(err)
-		}
+	if latestVersion != bin.Version {
+		fmt.Printf("upgrading %s from %s to %s\n", bin.Name, bin.Version, latestVersion)
+		return installBinByVersion(bin.Path, latestVersion)
 	}
 	return nil
 }
@@ -230,14 +259,17 @@ func fetchLatestVersion(modName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("%s", resp.Status)
-	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP error: %s", resp.Status)
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
+
 	var versionInfo struct {
 		Version string `json:"Version"`
 	}
@@ -248,8 +280,7 @@ func fetchLatestVersion(modName string) (string, error) {
 	return versionInfo.Version, nil
 }
 
-func installBinByVersion(cmdPath string, version string) error {
+func installBinByVersion(cmdPath, version string) error {
 	uri := fmt.Sprintf("%s@%s", cmdPath, version)
-	cmd := exec.Command("go", "install", uri)
-	return cmd.Run()
+	return exec.Command("go", "install", uri).Run()
 }
