@@ -191,12 +191,7 @@ func handleInstall(backupPath string) error {
 }
 
 func loadBinInfo(binPath string) (*BinInfo, error) {
-	file, err := os.Open(binPath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	info, err := buildinfo.Read(file)
+	info, err := buildinfo.ReadFile(binPath)
 	if err != nil {
 		return nil, err
 	}
