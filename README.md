@@ -63,9 +63,6 @@ gbvm upgrade bin1 bin2
 
 # Upgrade all binaries except development versions
 gbvm upgrade
-
-# Install binaries from backup
-gbvm install -backup=binaries.json
 ```
 
 ## License
