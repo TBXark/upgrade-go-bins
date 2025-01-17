@@ -75,6 +75,8 @@ func main() {
 			fmt.Println(err)
 			return
 		}
+	default:
+		fmt.Println("usage: go run main.go [list|upgrade]")
 	}
 }
 
