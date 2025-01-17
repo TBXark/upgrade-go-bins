@@ -142,9 +142,9 @@ func handleList(jsonMode, showVersion bool) error {
 		return err
 	}
 	if jsonMode {
-		encoded, err := json.MarshalIndent(versions, "", "  ")
-		if err != nil {
-			return err
+		encoded, e := json.MarshalIndent(versions, "", "  ")
+		if e != nil {
+			return e
 		}
 		fmt.Println(string(encoded))
 		return nil
@@ -165,16 +165,23 @@ func handleInstall(backupPath string) error {
 		return err
 	}
 	var versions []*BinInfo
-	if e := json.Unmarshal(file, &versions); e != nil {
-		return e
+	err = json.Unmarshal(file, &versions)
+	if err != nil {
+		return err
 	}
 	for _, v := range versions {
-		if info, le := loadBinInfo(v.Path); le == nil && info.Version == v.Version {
+		info, e := loadBinInfo(v.Path)
+		if e != nil {
+			fmt.Printf("failed to load %s: %v\n", v.Name, e)
+			continue
+		}
+		if info.Version == v.Version {
 			fmt.Printf("skip %s\n", v.Name)
 			continue
 		}
-		if ie := installBinByVersion(v.Path, v.Version); ie != nil {
-			fmt.Printf("failed to install %s: %v\n", v.Name, ie)
+		e = installBinByVersion(v.Path, v.Version)
+		if e != nil {
+			fmt.Printf("failed to install %s: %v\n", v.Name, e)
 		}
 	}
 	return nil
