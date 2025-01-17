@@ -5,7 +5,7 @@ A command line tool to manage Go binaries installed in your `GOPATH/bin` directo
 ## Installation
 
 ```bash
-go install github.com/tbxark/upgrade-go-bins@latest
+go install github.com/TBXark/upgrade-go-bins@latest
 ```
 
 ## Usage
@@ -73,3 +73,8 @@ upgrade-go-bins upgrade -all -skip-dev
 5. Install binaries from backup:
 ```bash
 upgrade-go-bins install -backup=binaries.json
+```
+
+## License
+
+**upgrade-go-bins** is released under the MIT license. [See LICENSE](LICENSE) for details.
