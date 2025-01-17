@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 )
 
 var (
@@ -175,14 +176,15 @@ func handleList(jsonMode, showVersion bool) error {
 		fmt.Println(string(encoded))
 		return nil
 	}
+	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	for _, v := range versions {
 		if showVersion {
-			fmt.Printf("%s\t%s\n", v.Name, v.Version)
+			_, _ = fmt.Fprintf(writer, "%s\t%s\n", v.Name, v.Version)
 		} else {
-			fmt.Println(v.Name)
+			_, _ = fmt.Fprintln(writer, v.Name)
 		}
 	}
-	return nil
+	return writer.Flush()
 }
 
 func handleInstall(backupPath string) error {
