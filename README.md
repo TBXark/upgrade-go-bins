@@ -1,11 +1,11 @@
-# upgrade-go-bins
+# gbvm
 
 A command line tool to manage Go binaries installed in your `GOPATH/bin` directory. It helps you list installed binaries, check their versions, and upgrade them to the latest available versions.
 
 ## Installation
 
 ```bash
-go install github.com/TBXark/upgrade-go-bins@latest
+go install github.com/TBXark/gbvm@latest
 ```
 
 ## Usage
@@ -17,7 +17,7 @@ The tool provides three main commands:
 Lists all Go binaries installed in your `GOPATH/bin` directory.
 
 ```bash
-upgrade-go-bins list [flags]
+gbvm list [flags]
 
 Flags:
   -version   Show version information (default: true)
@@ -29,7 +29,7 @@ Flags:
 Upgrades Go binaries to their latest versions.
 
 ```bash
-upgrade-go-bins upgrade [flags]
+gbvm upgrade [flags]
 
 Flags:
   -all       Upgrade all binaries (default: false)
@@ -42,7 +42,7 @@ Flags:
 Installs binaries from a backup JSON file.
 
 ```bash
-upgrade-go-bins install [flags]
+gbvm install [flags]
 
 Flags:
   -backup    Path to backup JSON file (required)
@@ -52,29 +52,29 @@ Flags:
 
 1. List all installed binaries with their versions:
 ```bash
-upgrade-go-bins list
+gbvm list
 ```
 
 2. List binaries in JSON format:
 ```bash
-upgrade-go-bins list -json
+gbvm list -json
 ```
 
 3. Upgrade a specific binary:
 ```bash
-upgrade-go-bins upgrade -bin=golangci-lint
+gbvm upgrade -bin=golangci-lint
 ```
 
 4. Upgrade all binaries except development versions:
 ```bash
-upgrade-go-bins upgrade -all -skip-dev
+gbvm upgrade -all -skip-dev
 ```
 
 5. Install binaries from backup:
 ```bash
-upgrade-go-bins install -backup=binaries.json
+gbvm install -backup=binaries.json
 ```
 
 ## License
 
-**upgrade-go-bins** is released under the MIT license. [See LICENSE](LICENSE) for details.
+**gbvm** is released under the MIT license. [See LICENSE](LICENSE) for details.
