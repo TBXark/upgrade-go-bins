@@ -32,26 +32,30 @@ type Command struct {
 }
 
 func main() {
-	loadGoConfig()
-
-	listCmd := setupListCommand()
-	upgradeCmd := setupUpgradeCommand()
-	installCmd := setupInstallCommand()
-
 	commands := map[string]*Command{
-		"list":    listCmd,
-		"upgrade": upgradeCmd,
-		"install": installCmd,
+		"list":    setupListCommand(),
+		"upgrade": setupUpgradeCommand(),
+		"install": setupInstallCommand(),
+	}
+
+	printDefaults := func() {
+		fmt.Printf("Usage: gbvm <command> [options]\n\n")
+		fmt.Printf("A command line tool to manage Go binaries\n\n")
+		for _, cmd := range commands {
+			fmt.Printf("%s commands:\n", cmd.Name)
+			cmd.FlagSet.PrintDefaults()
+			fmt.Println("")
+		}
 	}
 
 	if len(os.Args) < 2 {
-		printUsage()
+		printDefaults()
 		return
 	}
 
 	cmd, exists := commands[os.Args[1]]
 	if !exists {
-		printUsage()
+		printDefaults()
 		return
 	}
 
@@ -65,7 +69,7 @@ func main() {
 	}
 }
 
-func loadGoConfig() {
+func init() {
 	goPath := os.Getenv("GOPATH")
 	if goPath == "" {
 		goPath = "~/go"
@@ -90,13 +94,9 @@ func setupListCommand() *Command {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
 	showVersion := fs.Bool("version", true, "show version")
 	jsonMode := fs.Bool("json", false, "json mode")
-	return &Command{
-		Name:    "list",
-		FlagSet: fs,
-		HandleFunc: func() error {
-			return handleList(*jsonMode, *showVersion)
-		},
-	}
+	return NewCommand(fs, func() error {
+		return handleList(*jsonMode, *showVersion)
+	})
 }
 
 func setupUpgradeCommand() *Command {
@@ -104,34 +104,36 @@ func setupUpgradeCommand() *Command {
 	all := fs.Bool("all", false, "upgrade all")
 	bin := fs.String("bin", "", "bin name")
 	skipDev := fs.Bool("skip-dev", false, "skip dev version")
-
-	return &Command{
-		Name:    "upgrade",
-		FlagSet: fs,
-		HandleFunc: func() error {
-			if *all {
-				return upgradeAllBins(*skipDev)
-			}
-			return upgradeBin(*bin)
-		},
-	}
+	return NewCommand(fs, func() error {
+		if *all {
+			return upgradeAllBins(*skipDev)
+		}
+		return upgradeBin(*bin)
+	})
 }
 
 func setupInstallCommand() *Command {
 	fs := flag.NewFlagSet("install", flag.ExitOnError)
 	backupPath := fs.String("backup", "", "backup json path")
-
-	return &Command{
-		Name:    "install",
-		FlagSet: fs,
-		HandleFunc: func() error {
-			return handleInstall(*backupPath)
-		},
-	}
+	return NewCommand(fs, func() error {
+		return handleInstall(*backupPath)
+	})
 }
 
-func printUsage() {
-	fmt.Println("usage: go run main.go [list|upgrade|install]")
+func NewCommand(fs *flag.FlagSet, handleFunc func() error) *Command {
+	cmd := &Command{
+		Name:    fs.Name(),
+		FlagSet: fs,
+	}
+	help := cmd.FlagSet.Bool("help", false, "show help")
+	cmd.HandleFunc = func() error {
+		if *help {
+			fs.Usage()
+			return nil
+		}
+		return handleFunc()
+	}
+	return cmd
 }
 
 func handleList(jsonMode, showVersion bool) error {
