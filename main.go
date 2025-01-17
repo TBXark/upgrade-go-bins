@@ -30,6 +30,7 @@ type BinInfo struct {
 
 type Command struct {
 	Name       string
+	Usage      string
 	FlagSet    *flag.FlagSet
 	HandleFunc func() error
 }
@@ -95,31 +96,39 @@ func init() {
 
 func setupListCommand() *Command {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
-	showVersion := fs.Bool("version", true, "show version")
+	showVersion := fs.Bool("versions", false, "show version")
 	jsonMode := fs.Bool("json", false, "json mode")
-	return NewCommand(fs, func() error {
+	cmd := NewCommand(fs, func() error {
 		return handleList(*jsonMode, *showVersion)
 	})
+	return cmd
 }
 
 func setupUpgradeCommand() *Command {
 	fs := flag.NewFlagSet("upgrade", flag.ExitOnError)
-	all := fs.Bool("all", false, "upgrade all")
-	bin := fs.String("bin", "", "bin name")
 	skipDev := fs.Bool("skip-dev", false, "skip dev version")
 	return NewCommand(fs, func() error {
-		if *all {
+		if fs.NArg() == 0 {
 			return upgradeAllBins(*skipDev)
+		} else {
+			for _, binName := range fs.Args() {
+				fmt.Printf("upgrading %s\n", binName)
+				if err := upgradeBin(binName); err != nil {
+					return err
+				}
+			}
+			return nil
 		}
-		return upgradeBin(*bin)
 	})
 }
 
 func setupInstallCommand() *Command {
 	fs := flag.NewFlagSet("install", flag.ExitOnError)
-	backupPath := fs.String("backup", "", "backup json path")
 	return NewCommand(fs, func() error {
-		return handleInstall(*backupPath)
+		if fs.NArg() == 0 {
+			return fmt.Errorf("missing backup file")
+		}
+		return handleInstall(fs.Arg(0))
 	})
 }
 

@@ -10,68 +10,51 @@ go install github.com/TBXark/gbvm@latest
 
 ## Usage
 
-The tool provides three main commands:
-
-### List Command
-
-Lists all Go binaries installed in your `GOPATH/bin` directory.
-
 ```bash
-gbvm list [flags]
+Usage: gbvm <command> [options]
 
-Flags:
-  -version   Show version information (default: true)
-  -json      Output in JSON format (default: false)
-```
+A command line tool to manage Go binaries
 
-### Upgrade Command
+list commands:
+  -help
+        show help
+  -json
+        json mode
+  -versions
+        show version
 
-Upgrades Go binaries to their latest versions.
+upgrade commands:
+  -help
+        show help
+  -skip-dev
+        skip dev version
 
-```bash
-gbvm upgrade [flags]
-
-Flags:
-  -all       Upgrade all binaries (default: false)
-  -bin       Specify a binary name to upgrade
-  -skip-dev  Skip binaries with 'devel' version (default: false)
-```
+install commands:
+  -help
+        show help
+````
 
 ### Install Command
 
 Installs binaries from a backup JSON file.
 
 ```bash
-gbvm install [flags]
+# Install binaries from backup
+gbvm install backup.json
 
-Flags:
-  -backup    Path to backup JSON file (required)
-```
+# List all installed binaries with their versions
+gbvm list -versions
 
-## Examples
-
-1. List all installed binaries with their versions:
-```bash
-gbvm list
-```
-
-2. List binaries in JSON format:
-```bash
+# List binaries in JSON format
 gbvm list -json
-```
 
-3. Upgrade a specific binary:
-```bash
-gbvm upgrade -bin=golangci-lint
-```
+# Upgrade a specific binary
+gbvm upgrade bin1 bin2
 
-4. Upgrade all binaries except development versions:
-```bash
-gbvm upgrade -all -skip-dev
-```
+# Upgrade all binaries except development versions
+gbvm upgrade
 
-5. Install binaries from backup:
-```bash
+# Install binaries from backup
 gbvm install -backup=binaries.json
 ```
 
