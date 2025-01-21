@@ -3,6 +3,7 @@ package main
 import (
 	"debug/buildinfo"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -198,15 +199,20 @@ func handleInstall(backupPath string) error {
 		return err
 	}
 	for _, v := range versions {
-		info, e := loadBinInfo(v.Path)
+		binPath := filepath.Join(GoPath, "bin", v.Name)
+		info, e := loadBinInfo(binPath)
 		if e != nil {
-			fmt.Printf("failed to load %s: %v\n", v.Name, e)
-			continue
+			if !errors.Is(e, os.ErrNotExist) {
+				fmt.Printf("failed to load %s: %v\n", v.Name, e)
+				continue
+			}
+		} else {
+			if info.Version == v.Version {
+				fmt.Printf("skip %s\n", v.Name)
+				continue
+			}
 		}
-		if info.Version == v.Version {
-			fmt.Printf("skip %s\n", v.Name)
-			continue
-		}
+		fmt.Printf("installing %s\n", v.Name)
 		e = installBinByVersion(v.Path, v.Version)
 		if e != nil {
 			fmt.Printf("failed to install %s: %v\n", v.Name, e)
